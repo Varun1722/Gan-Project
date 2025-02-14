@@ -1,13 +1,12 @@
 """
 Implementation of ProGAN generator and discriminator with the key
-attributions from the paper. We have tried to make the implementation
-compact but a goal is also to keep it readable and understandable.
+attributions from the paper.
 Specifically the key points implemented are:
 
 1) Progressive growing (of model and layers)
 2) Minibatch std on Discriminator
 3) Normalization with PixelNorm
-4) Equalized Learning Rate (here I cheated and only did it on Conv layers)
+4) Equalized Learning Rate (here deviated a bit and only did it on Conv layers)
 """
 
 import torch
@@ -30,9 +29,6 @@ class WSConv2d(nn.Module):
     Weight scaled Conv2d (Equalized Learning Rate)
     Note that input is multiplied rather than changing weights
     this will have the same result.
-
-    Inspired and looked at:
-    https://github.com/nvnbny/progressive_growing_of_gans/blob/master/modelUtils.py
     """
 
     def __init__(
@@ -102,7 +98,7 @@ class Generator(nn.Module):
 
         for i in range(
             len(factors) - 1
-        ):  # -1 to prevent index error because of factors[i+1]
+        ):  
             conv_in_c = int(in_channels * factors[i])
             conv_out_c = int(in_channels * factors[i + 1])
             self.prog_blocks.append(ConvBlock(conv_in_c, conv_out_c))
@@ -125,7 +121,7 @@ class Generator(nn.Module):
             out = self.prog_blocks[step](upscaled)
 
         # The number of channels in upscale will stay the same, while
-        # out which has moved through prog_blocks might change. To ensure
+        # out which has moved through prog_blocks might change. To ensure 
         # we can convert both to rgb we use different rgb_layers
         # (steps-1) and steps for upscaled, out respectively
         final_upscaled = self.rgb_layers[steps - 1](upscaled)
@@ -134,7 +130,7 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, z_dim, in_channels, img_channels=3):
+    def __init__(self, in_channels, img_channels=3):
         super(Discriminator, self).__init__()
         self.prog_blocks, self.rgb_layers = nn.ModuleList([]), nn.ModuleList([])
         self.leaky = nn.LeakyReLU(0.2)
@@ -169,7 +165,7 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2),
             WSConv2d(
                 in_channels, 1, kernel_size=1, padding=0, stride=1
-            ),  # we use this instead of linear layer
+            ), 
         )
 
     def fade_in(self, alpha, downscaled, out):
@@ -187,10 +183,6 @@ class Discriminator(nn.Module):
         return torch.cat([x, batch_statistics], dim=1)
 
     def forward(self, x, alpha, steps):
-        # where we should start in the list of prog_blocks, maybe a bit confusing but
-        # the last is for the 4x4. So example let's say steps=1, then we should start
-        # at the second to last because input_size will be 8x8. If steps==0 we just
-        # use the final block
         cur_step = len(self.prog_blocks) - steps
 
         # convert from rgb as initial step, this will depend on
@@ -222,7 +214,7 @@ if __name__ == "__main__":
     Z_DIM = 100
     IN_CHANNELS = 256
     gen = Generator(Z_DIM, IN_CHANNELS, img_channels=3)
-    critic = Discriminator(Z_DIM, IN_CHANNELS, img_channels=3)
+    critic = Discriminator(IN_CHANNELS, img_channels=3)
 
     for img_size in [4, 8, 16, 32, 64, 128, 256, 512, 1024]:
         num_steps = int(log2(img_size / 4))
